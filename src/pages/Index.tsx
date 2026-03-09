@@ -1,16 +1,18 @@
 import { useState, useCallback } from "react";
-import { getProjects, getRandomIncompleteProject, getAcceptedProjects, Project } from "@/lib/projects";
+import { getProjects, getRandomIncompleteProject, Project } from "@/lib/projects";
 import BigRedButton from "@/components/BigRedButton";
 import AddProjectModal from "@/components/AddProjectModal";
 import ProjectList from "@/components/ProjectList";
 import AssignmentOverlay from "@/components/AssignmentOverlay";
 import ProgressTracker from "@/components/ProgressTracker";
-import { Flame, ListTodo, Activity } from "lucide-react";
+import InterestSuggestions from "@/components/InterestSuggestions";
+import { Flame, Zap, Activity, ListTodo, Sparkles } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 const Index = () => {
   const [projects, setProjects] = useState<Project[]>(getProjects);
   const [assignedProject, setAssignedProject] = useState<Project | null>(null);
-  const [view, setView] = useState<"button" | "list" | "progress">("button");
+  const [tab, setTab] = useState("button");
 
   const refresh = useCallback(() => setProjects(getProjects()), []);
 
@@ -32,57 +34,77 @@ const Index = () => {
             <span className="text-gradient-fire">AntiProcrastinator</span>
           </h1>
         </div>
-        <div className="flex items-center gap-3">
-          {acceptedProjects.length > 0 && (
-            <button
-              onClick={() => setView(view === "progress" ? "button" : "progress")}
-              className="flex items-center gap-2 text-sm text-accent hover:text-foreground transition-colors"
-            >
-              <Activity className="w-4 h-4" />
-              {acceptedProjects.length} active
-            </button>
-          )}
-          <button
-            onClick={() => setView(view === "list" ? "button" : "list")}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ListTodo className="w-4 h-4" />
-            {incompleteCount} queued
-          </button>
-          <AddProjectModal onAdded={refresh} />
-        </div>
+        <AddProjectModal onAdded={refresh} />
       </header>
+
+      {/* Tab Navigation */}
+      <div className="border-b border-border px-6">
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="bg-transparent h-auto p-0 gap-1">
+            <TabsTrigger
+              value="button"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-3"
+            >
+              <Zap className="w-4 h-4 mr-2" />
+              Go!
+            </TabsTrigger>
+            <TabsTrigger
+              value="progress"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-3"
+            >
+              <Activity className="w-4 h-4 mr-2" />
+              Progress
+              {acceptedProjects.length > 0 && (
+                <span className="ml-1.5 text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded-full">
+                  {acceptedProjects.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="list"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-3"
+            >
+              <ListTodo className="w-4 h-4 mr-2" />
+              Queue
+              {incompleteCount > 0 && (
+                <span className="ml-1.5 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full">
+                  {incompleteCount}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="interests"
+              className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-none border-b-2 border-transparent data-[state=active]:border-primary px-4 py-3"
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Discover
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
 
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-6">
-        {view === "list" ? (
+        {tab === "button" && (
+          <BigRedButton onClick={handleSmash} disabled={incompleteCount === 0} />
+        )}
+        {tab === "progress" && (
           <div className="w-full max-w-2xl py-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Your Projects</h2>
-              <button
-                onClick={() => setView("button")}
-                className="text-sm text-primary hover:underline"
-              >
-                Back to button
-              </button>
-            </div>
-            <ProjectList projects={projects} onUpdate={refresh} />
-          </div>
-        ) : view === "progress" ? (
-          <div className="w-full max-w-2xl py-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold">Active Projects</h2>
-              <button
-                onClick={() => setView("button")}
-                className="text-sm text-primary hover:underline"
-              >
-                Back to button
-              </button>
-            </div>
             <ProgressTracker projects={acceptedProjects} onUpdate={refresh} />
           </div>
-        ) : (
-          <BigRedButton onClick={handleSmash} disabled={incompleteCount === 0} />
+        )}
+        {tab === "list" && (
+          <div className="w-full max-w-2xl py-8">
+            <ProjectList projects={projects} onUpdate={refresh} />
+          </div>
+        )}
+        {tab === "interests" && (
+          <div className="w-full max-w-2xl py-8">
+            <p className="text-muted-foreground text-sm mb-4">
+              Tell us your interests and AI will suggest projects for you to add to your queue.
+            </p>
+            <InterestSuggestions onAdded={refresh} />
+          </div>
         )}
       </main>
 
