@@ -1,14 +1,31 @@
-import { Project } from "@/lib/projects";
+import { Project, acceptProject } from "@/lib/projects";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, Zap } from "lucide-react";
+import { X, ExternalLink, Zap, ThumbsUp, Shuffle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface AssignmentOverlayProps {
   project: Project | null;
   onClose: () => void;
+  onAccept: (project: Project) => void;
+  onDecline: () => void;
 }
 
-const AssignmentOverlay = ({ project, onClose }: AssignmentOverlayProps) => {
+const AssignmentOverlay = ({ project, onClose, onAccept, onDecline }: AssignmentOverlayProps) => {
+  const handleAccept = () => {
+    if (!project) return;
+    acceptProject(project.id);
+    toast.success("Project accepted! Let's track your progress.");
+    onAccept(project);
+    onClose();
+  };
+
+  const handleDecline = () => {
+    toast("Reshuffled! Try again when you're ready.", { icon: "🔀" });
+    onDecline();
+    onClose();
+  };
+
   return (
     <AnimatePresence>
       {project && (
@@ -38,7 +55,7 @@ const AssignmentOverlay = ({ project, onClose }: AssignmentOverlayProps) => {
             </div>
 
             <h2 className="text-2xl font-bold mb-3">{project.title}</h2>
-            
+
             {project.description && (
               <p className="text-muted-foreground mb-6">{project.description}</p>
             )}
@@ -50,17 +67,30 @@ const AssignmentOverlay = ({ project, onClose }: AssignmentOverlayProps) => {
               <p className="text-foreground font-medium">{project.firstStep}</p>
             </div>
 
+            {project.url && (
+              <a
+                href={project.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
+              >
+                <ExternalLink className="w-4 h-4" />
+                View original link
+              </a>
+            )}
+
             <div className="flex gap-3">
-              {project.url && (
-                <Button asChild variant="outline" className="flex-1 border-primary/30 hover:border-primary hover:bg-primary/10">
-                  <a href={project.url} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Open Link
-                  </a>
-                </Button>
-              )}
-              <Button onClick={onClose} className="flex-1">
-                Let's Go!
+              <Button
+                onClick={handleDecline}
+                variant="outline"
+                className="flex-1 border-border hover:border-muted-foreground"
+              >
+                <Shuffle className="w-4 h-4 mr-2" />
+                Decline
+              </Button>
+              <Button onClick={handleAccept} className="flex-1">
+                <ThumbsUp className="w-4 h-4 mr-2" />
+                Accept
               </Button>
             </div>
           </motion.div>
