@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Link as LinkIcon } from "lucide-react";
-import { addProject, extractProjectFromUrl } from "@/lib/projects";
+import { Plus, Link as LinkIcon, Loader2, Sparkles } from "lucide-react";
+import { addProject } from "@/lib/projects";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface AddProjectModalProps {
@@ -14,42 +14,52 @@ interface AddProjectModalProps {
 const AddProjectModal = ({ onAdded }: AddProjectModalProps) => {
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [firstStep, setFirstStep] = useState("");
-  const [extracted, setExtracted] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
 
-  const handleUrlPaste = (value: string) => {
-    setUrl(value);
-    if (value.startsWith("http://") || value.startsWith("https://")) {
-      const info = extractProjectFromUrl(value);
-      setTitle(info.title);
-      setDescription(info.description);
-      setFirstStep(info.firstStep);
-      setExtracted(true);
-    }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) {
-      toast.error("Give your project a title!");
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      toast.error("Paste a link first!");
       return;
     }
-    addProject({
-      url: url.trim(),
-      title: title.trim(),
-      description: description.trim(),
-      firstStep: firstStep.trim() || "Open the link and get started!",
-    });
-    toast.success("Project added! One less excuse.");
-    setUrl("");
-    setTitle("");
-    setDescription("");
-    setFirstStep("");
-    setExtracted(false);
-    setOpen(false);
-    onAdded();
+
+    // Ensure it's a valid URL
+    let finalUrl = trimmedUrl;
+    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    setAnalyzing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("analyze-link", {
+        body: { url: finalUrl },
+      });
+
+      if (error || !data?.success) {
+        const msg = data?.error || error?.message || "Failed to analyze link";
+        toast.error(msg);
+        return;
+      }
+
+      const { project } = data;
+      addProject({
+        url: finalUrl,
+        title: project.title,
+        description: project.description,
+        firstStep: project.firstStep,
+      });
+
+      toast.success(`Added: ${project.title}`);
+      setUrl("");
+      setOpen(false);
+      onAdded();
+    } catch (err) {
+      console.error(err);
+      toast.error("Something went wrong analyzing this link.");
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   return (
@@ -62,55 +72,35 @@ const AddProjectModal = ({ onAdded }: AddProjectModalProps) => {
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-gradient-fire text-xl">Add a Project Idea</DialogTitle>
+          <DialogTitle className="text-gradient-fire text-xl">Add a Project</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
               <LinkIcon className="w-4 h-4 text-muted-foreground" />
-              <label className="text-sm font-medium text-muted-foreground">Paste a link</label>
+              <label className="text-sm font-medium text-muted-foreground">Paste any link</label>
             </div>
             <Input
-              placeholder="https://instagram.com/p/..."
+              placeholder="https://instagram.com/p/... or any URL"
               value={url}
-              onChange={(e) => handleUrlPaste(e.target.value)}
+              onChange={(e) => setUrl(e.target.value)}
               className="bg-secondary border-border"
+              disabled={analyzing}
             />
           </div>
-          {extracted && (
-            <p className="text-xs text-accent">✨ Auto-detected! Edit the details below if needed.</p>
-          )}
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Project title</label>
-            <Input
-              placeholder="My awesome project"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="bg-secondary border-border"
-              required
-            />
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sparkles className="w-3 h-3 text-accent" />
+            <span>AI will analyze the link and identify the project for you</span>
           </div>
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-1.5 block">Description</label>
-            <Textarea
-              placeholder="What's this project about?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="bg-secondary border-border resize-none"
-              rows={2}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-1.5 block">First step to get started</label>
-            <Input
-              placeholder="e.g. Buy materials from the store"
-              value={firstStep}
-              onChange={(e) => setFirstStep(e.target.value)}
-              className="bg-secondary border-border"
-            />
-          </div>
-          <Button type="submit" className="w-full">
-            Save Project
+          <Button type="submit" className="w-full" disabled={analyzing || !url.trim()}>
+            {analyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              "Add Project"
+            )}
           </Button>
         </form>
       </DialogContent>
